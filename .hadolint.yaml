@@ -5,3 +5,4 @@
 ignored:
   - DL3008 # pinning apt-get install versions
   - DL3015 # Avoid additional packages by specifying `--no-install-recommends`
+  - DL3020 # use COPY instead of ADD
