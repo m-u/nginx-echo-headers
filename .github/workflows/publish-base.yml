@@ -60,7 +60,7 @@ jobs:
         id: meta
         run: | 
           VERSION=$(cat version)
-          echo "::set-output name=tags::${{ secrets.DOCKER_HUB_USER }}/awscli2-kubectl:${VERSION}"
+          echo "::set-output name=tags::${{ secrets.DOCKER_HUB_USER }}/nginx-echo-headers:${VERSION}"
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2
