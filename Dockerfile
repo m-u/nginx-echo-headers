@@ -5,7 +5,7 @@ ARG BUILDPLATFORM
 ARG TARGET
 
 EXPOSE 8080
-ADD nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
+COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
 RUN if [ $TARGETPLATFORM = 'linux/amd64' ]; then TARGET=amd64; else TARGET=arm64; fi; \
     echo "TARGET=$TARGET"; \
