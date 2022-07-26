@@ -1,4 +1,3 @@
-# testing a comment
 FROM openresty/openresty:1.17.8.2-5-alpine
 
 ARG TARGETPLATFORM
