@@ -1,6 +1,7 @@
 {{- $httpsEnabled := .Values.ingress.https.enabled -}}
-{{- $fullname := include "nginx-echo-headers.fullname" . }}
-{{- $servicePort := .Values.service.port }}
+{{- $fullname := include "nginx-echo-headers.fullname" . -}}
+{{- $servicePort := .Values.service.port -}}
+{{- $redirectMiddlewares := .Values.ingress.https.redirectMiddlewares -}}
 
 {{- if .Values.ingress.enabled }}
 {{- if $httpsEnabled }}
@@ -11,16 +12,16 @@ metadata:
   name: {{ include "nginx-echo-headers.fullname" . }}
 spec:
   entryPoints:
-    - websecure
+  - websecure
   routes:
-    {{- range .Values.ingress.dnsNames }}
-    - kind: Rule
-      match: Host(`{{.}}`)
-      priority: 10
-      services:
-        - name: {{ $fullname }}-https
-          port: {{ $servicePort }}
-    {{- end }}
+  {{- range .Values.ingress.dnsNames }}
+  - kind: Rule
+    match: Host(`{{.}}`)
+    priority: 10
+    services:
+    - name: {{ $fullname }}-https
+      port: {{ $servicePort }}
+  {{- end }}
   tls:
     secretName: {{ include "nginx-echo-headers.fullname" . }}
 {{- end }}
@@ -33,17 +34,19 @@ spec:
   entryPoints:
     - web
   routes:
-    {{- range .Values.ingress.dnsNames }}
-    - kind: Rule
-      match: Host(`{{.}}`)
-      priority: 10
-      services:
-        - name: {{ $fullname }}-https
-          port: {{ $servicePort }}
-      {{- if  $httpsEnabled }}
-      middlewares:
-      - name: redirect-https
-        namespace: kube-system
-      {{- end }}
+  {{- range .Values.ingress.dnsNames }}
+  - kind: Rule
+    match: Host(`{{.}}`)
+    priority: 10
+    services:
+    - name: {{ $fullname }}-https
+      port: {{ $servicePort }}
+    {{- if  $httpsEnabled }}
+    middlewares:
+    {{-  range $redirectMiddlewares }}
+    - name: {{ .name }}
+      namespace: {{ .namespace }}
     {{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}
