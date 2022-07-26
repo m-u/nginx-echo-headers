@@ -1,0 +1,49 @@
+{{- $httpsEnabled := .Values.ingress.https.enabled -}}
+{{- $fullname := include "nginx-echo-headers.fullname" . }}
+{{- $servicePort := .Values.service.port }}
+
+{{- if .Values.ingress.enabled }}
+{{- if $httpsEnabled }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "nginx-echo-headers.fullname" . }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    {{- range .Values.ingress.dnsNames }}
+    - kind: Rule
+      match: Host(`{{.}}`)
+      priority: 10
+      services:
+        - name: {{ $fullname }}-https
+          port: {{ $servicePort }}
+    {{- end }}
+  tls:
+    secretName: {{ include "nginx-echo-headers.fullname" . }}
+{{- end }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "nginx-echo-headers.fullname" . }}-http
+spec:
+  entryPoints:
+    - web
+  routes:
+    {{- range .Values.ingress.dnsNames }}
+    - kind: Rule
+      match: Host(`{{.}}`)
+      priority: 10
+      services:
+        - name: {{ $fullname }}-https
+          port: {{ $servicePort }}
+      {{- if  $httpsEnabled }}
+      middlewares:
+      - name: redirect-https
+        namespace: kube-system
+      {{- end }}
+    {{- end }}
+{{- end }}
