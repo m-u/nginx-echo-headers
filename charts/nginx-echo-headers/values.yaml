@@ -24,6 +24,13 @@ traefik:
     - name: redirect-https
       namespace: test-ns
 
+deployment:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25
+      maxUnavailable: 25
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
