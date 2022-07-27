@@ -10,7 +10,7 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: {{ include "nginx-echo-headers.fullname" . }}
+  name: {{ include "nginx-echo-headers.fullname" . }}-https
 spec:
   entryPoints:
   - websecure
@@ -20,7 +20,7 @@ spec:
     match: Host(`{{.}}`)
     priority: 10
     services:
-    - name: {{ $fullname }}-https
+    - name: {{ $fullname }}
       port: {{ $servicePort }}
   {{- end }}
   tls:
@@ -40,7 +40,7 @@ spec:
     match: Host(`{{.}}`)
     priority: 10
     services:
-    - name: {{ $fullname }}-https
+    - name: {{ $fullname }}
       port: {{ $servicePort }}
     {{- if  $httpsEnabled }}
     middlewares:
