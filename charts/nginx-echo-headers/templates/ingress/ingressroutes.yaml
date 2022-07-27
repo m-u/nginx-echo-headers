@@ -1,9 +1,9 @@
-{{- $httpsEnabled := .Values.ingress.https.enabled -}}
+{{- $httpsEnabled := .Values.traefik.https.enabled -}}
 {{- $fullname := include "nginx-echo-headers.fullname" . -}}
 {{- $servicePort := .Values.service.port -}}
-{{- $redirectMiddlewares := .Values.ingress.https.redirectMiddlewares -}}
+{{- $middlewares := .Values.traefik.https.middlewares -}}
 
-{{- if .Values.ingress.enabled }}
+{{- if .Values.traefik.enabled }}
 {{- if $httpsEnabled }}
 ---
 apiVersion: traefik.containo.us/v1alpha1
@@ -14,7 +14,7 @@ spec:
   entryPoints:
   - websecure
   routes:
-  {{- range .Values.ingress.dnsNames }}
+  {{- range .Values.traefik.dnsNames }}
   - kind: Rule
     match: Host(`{{.}}`)
     priority: 10
@@ -34,7 +34,7 @@ spec:
   entryPoints:
     - web
   routes:
-  {{- range .Values.ingress.dnsNames }}
+  {{- range .Values.traefik.dnsNames }}
   - kind: Rule
     match: Host(`{{.}}`)
     priority: 10
@@ -43,7 +43,7 @@ spec:
       port: {{ $servicePort }}
     {{- if  $httpsEnabled }}
     middlewares:
-    {{-  range $redirectMiddlewares }}
+    {{-  range $middlewares }}
     - name: {{ .name }}
       namespace: {{ .namespace }}
     {{- end }}

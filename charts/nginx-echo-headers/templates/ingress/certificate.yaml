@@ -1,4 +1,4 @@
-{{- if and .Values.ingress.enabled .Values.ingress.https.enabled  }}
+{{- if and .Values.traefik.enabled .Values.traefik.https.enabled  }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -8,25 +8,25 @@ spec:
   # Secret names are always required.
   secretName: {{ include "nginx-echo-headers.fullname" . }}
   # Hard limit set by Let's Encrypt, non changeable
-  duration: {{ .Values.ingress.https.certificate.duration }}
-  renewBefore: {{ .Values.ingress.https.certificate.renewBefore }}
+  duration: {{ .Values.traefik.https.certificate.duration }}
+  renewBefore: {{ .Values.traefik.https.certificate.renewBefore }}
   subject:
     organizations:
-      {{- range .Values.ingress.https.certificate.organizations }}
+      {{- range .Values.traefik.https.certificate.organizations }}
       - {{ . }}
       {{- end }}
   # At least one of a DNS Name, URI, or IP address is required.
   dnsNames:
-      {{- range .Values.ingress.dnsNames }}
+      {{- range .Values.traefik.dnsNames }}
       - {{ . }}
       {{- end }}
   # Issuer references are always required.
   issuerRef:
-    name: {{ .Values.ingress.https.certificate.issuer.name }}
+    name: {{ .Values.traefik.https.certificate.issuer.name }}
     # We can reference ClusterIssuers by changing the kind here.
     # The default value is Issuer (i.e. a locally namespaced Issuer)
-    kind: {{ .Values.ingress.https.certificate.issuer.kind | default "Issuer" }}
+    kind: {{ .Values.traefik.https.certificate.issuer.kind | default "Issuer" }}
     # This is optional since cert-manager will default to this value however
     # if you are using an external issuer, change this to that issuer group.
-    group: {{ .Values.ingress.https.certificate.issuer.group | default "cert-manager.io" }}
+    group: {{ .Values.traefik.https.certificate.issuer.group | default "cert-manager.io" }}
 {{- end }}
