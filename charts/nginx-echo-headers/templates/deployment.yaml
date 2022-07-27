@@ -8,6 +8,16 @@ spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
+  strategy:
+    {{- if and (ne .Values.deployment.strategy.type "Recreate") (ne .Values.deployment.strategy.type "RollingUpdate") }}
+    {{- fail "deployment.strategy.type is case-sensitive and must be one of 'Recreate' or 'RollingUpdate'" }}
+    {{- end }}
+    type: {{ .Values.deployment.strategy.type }}
+    {{- if ne .Values.deployment.strategy.type "Recreate" }}
+    rollingUpdate:
+      maxSurge: {{ .Values.deployment.strategy.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ .Values.deployment.strategy.rollingUpdate.maxUnavailable }}
+    {{- end }}
   selector:
     matchLabels:
       {{- include "nginx-echo-headers.selectorLabels" . | nindent 6 }}
