@@ -2,6 +2,7 @@
 {{- $fullname := include "nginx-echo-headers.fullname" . -}}
 {{- $servicePort := .Values.service.port -}}
 {{- $middlewares := .Values.traefik.https.middlewares -}}
+{{- $releaseNamespace := .Release.Namespace }}
 
 {{- if .Values.traefik.enabled }}
 {{- if $httpsEnabled }}
@@ -45,7 +46,7 @@ spec:
     middlewares:
     {{-  range $middlewares }}
     - name: {{ .name }}
-      namespace: {{ .namespace }}
+      namespace: {{ .namespace | default $releaseNamespace }}
     {{- end }}
     {{- end }}
   {{- end }}
