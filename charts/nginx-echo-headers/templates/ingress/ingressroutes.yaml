@@ -1,0 +1,53 @@
+{{- $httpsEnabled := .Values.traefik.https.enabled -}}
+{{- $fullname := include "nginx-echo-headers.fullname" . -}}
+{{- $servicePort := .Values.service.port -}}
+{{- $middlewares := .Values.traefik.https.middlewares -}}
+{{- $releaseNamespace := .Release.Namespace }}
+
+{{- if .Values.traefik.enabled }}
+{{- if $httpsEnabled }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "nginx-echo-headers.fullname" . }}-https
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  {{- range .Values.traefik.dnsNames }}
+  - kind: Rule
+    match: Host(`{{.}}`)
+    priority: 10
+    services:
+    - name: {{ $fullname }}
+      port: {{ $servicePort }}
+  {{- end }}
+  tls:
+    secretName: {{ include "nginx-echo-headers.fullname" . }}
+{{- end }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "nginx-echo-headers.fullname" . }}-http
+spec:
+  entryPoints:
+    - web
+  routes:
+  {{- range .Values.traefik.dnsNames }}
+  - kind: Rule
+    match: Host(`{{.}}`)
+    priority: 10
+    services:
+    - name: {{ $fullname }}
+      port: {{ $servicePort }}
+    {{- if  $httpsEnabled }}
+    middlewares:
+    {{-  range $middlewares }}
+    - name: {{ .name }}
+      namespace: {{ .namespace | default $releaseNamespace }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
