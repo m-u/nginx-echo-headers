@@ -1,0 +1,390 @@
+{{- if .Values.argoRollout.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "nginx-echo-headers.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  analysis:
+    # limits the number of successful analysis runs and experiments to be stored in a history
+    # Defaults to 5.
+    successfulRunHistoryLimit: {{ .Values.argoRollout.successfulRunHistoryLimit | default "5" }}
+    # limits the number of unsuccessful analysis runs and experiments to be stored in a history. 
+    # Stages for unsuccessful: "Error", "Failed", "Inconclusive"
+    # Defaults to 5.
+    unsuccessfulRunHistoryLimit: {{ .Values.argoRollout.unsuccessfulRunHistoryLimit | default "5" }}
+
+  {{- if not .Values.argoRollout.workloadRef }}
+  # Label selector for pods. Existing ReplicaSets whose pods are selected by
+  # this will be the ones affected by this rollout. It must match the pod
+  # template's labels.
+  selector:
+    matchLabels:
+      {{- include "nginx-echo-headers.selectorLabels" . | nindent 6 }}
+  {{- end }}
+
+  {{- if .Values.argoRollout.workloadRef }}
+  # WorkloadRef holds a references to a workload that provides Pod template 
+  # (e.g. Deployment). If used, then do not use Rollout template property.
+  workloadRef: 
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "nginx-echo-headers.fullname" . }}
+  {{- end }}
+
+  {{- if not .Values.argoRollout.workloadRef }}
+  # Template describes the pods that will be created. Same as deployment.
+  # If used, then do not use Rollout workloadRef property. 
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "nginx-echo-headers.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "nginx-echo-headers.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- end }}
+
+  # Minimum number of seconds for which a newly created pod should be ready
+  # without any of its container crashing, for it to be considered available.
+  # Defaults to 0 (pod will be considered available as soon as it is ready)
+  minReadySeconds: {{ .Values.argoRollout.minReadySeconds | default "0" }}
+
+  # The number of old ReplicaSets to retain.
+  # Defaults to 10
+  revisionHistoryLimit: {{ .Values.argoRollout.revisionHistoryLimit | default "10" }}
+
+  # Pause allows a user to manually pause a rollout at any time. A rollout
+  # will not advance through its steps while it is manually paused, but HPA
+  # auto-scaling will still occur. Typically not explicitly set the manifest,
+  # but controlled via tools (e.g. kubectl argo rollouts pause). If true at
+  # initial creation of Rollout, replicas are not scaled up automatically
+  # from zero unless manually promoted.
+  paused: {{ .Values.argoRollout.revisionHistoryLimit | default "false" }}
+
+  # The maximum time in seconds in which a rollout must make progress during
+  # an update, before it is considered to be failed. Argo Rollouts will
+  # continue to process failed rollouts and a condition with a
+  # ProgressDeadlineExceeded reason will be surfaced in the rollout status.
+  # Note that progress will not be estimated during the time a rollout is
+  # paused.
+  # Defaults to 600s
+  progressDeadlineSeconds: {{ .Values.argoRollout.progressDeadlineSeconds | default "600" }}
+
+  # Whether to abort the update when ProgressDeadlineSeconds is exceeded.
+  # Optional and default is false.
+  progressDeadlineAbort: {{ .Values.argoRollout.progressDeadlineAbort | default "false" }}
+
+  strategy:
+    {{- if and (.Values.argoRollout.blueGreen.enabled) (.Values.argoRollout.canary.enabled) }}
+    {{- fail "Argo-Rollout cannot do both blue/green and canary. Must disable one of the two"}}
+    {{- end }}
+    {{- if and (.Values.argoRollout.blueGreen.enabled) (not .Values.argoRollout.canary.enabled) }}
+    # Blue-green update strategy
+    blueGreen:
+
+      # Reference to service that the rollout modifies as the active service.
+      # Required.
+      activeService: {{ include "nginx-echo-headers.fullname" . }}
+
+      {{- if .Values.argoRollout.blueGreen.promotionAnalysis }}
+      # Pre-promotion analysis run which performs analysis before the service
+      # cutover. +optional
+      prePromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: {{ include "nginx-echo-headers.fullname" . }}.{{.Release.Namespace}}.svc.cluster.local
+
+      # Post-promotion analysis run which performs analysis after the service
+      # cutover. +optional
+      postPromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: {{ include "nginx-echo-headers.fullname" . }}.{{.Release.Namespace}}.svc.cluster.local
+      {{- end }}
+
+      {{- if .Values.argoRollout.blueGreen.previewService }}
+      # Name of the service that the rollout modifies as the preview service.
+      # +optional
+      previewService: {{- .Values.argoRollout.blueGreen.previewService }}
+
+      # The number of replicas to run under the preview service before the
+      # switchover. Once the rollout is resumed the new ReplicaSet will be fully
+      # scaled up before the switch occurs +optional
+      previewReplicaCount: {{- .Values.argoRollout.blueGreen.previewReplicaCount }}
+      {{- end }}
+
+      # Indicates if the rollout should automatically promote the new ReplicaSet
+      # to the active service or enter a paused state. If not specified, the
+      # default value is true. +optional
+      autoPromotionEnabled: {{ .Values.argoRollout.blueGreen.autoPromotionEnabled | default "true" }}
+
+      # Automatically promotes the current ReplicaSet to active after the
+      # specified pause delay in seconds after the ReplicaSet becomes ready.
+      # If omitted, the Rollout enters and remains in a paused state until
+      # manually resumed by resetting spec.Paused to false. +optional
+      autoPromotionSeconds: {{ .Values.argoRollout.blueGreen.autoPromotionSeconds | default "30" }}
+
+      # Adds a delay before scaling down the previous ReplicaSet. If omitted,
+      # the Rollout waits 30 seconds before scaling down the previous ReplicaSet.
+      # A minimum of 30 seconds is recommended to ensure IP table propagation
+      # across the nodes in a cluster.
+      scaleDownDelaySeconds: {{ .Values.argoRollout.blueGreen.scaleDownDelaySeconds | default "30" }}
+
+      # Limits the number of old RS that can run at once before getting scaled
+      # down. Defaults to nil
+      scaleDownDelayRevisionLimit: {{ .Values.argoRollout.blueGreen.scaleDownDelaySeconds | default "2" }}
+
+      # Add a delay in second before scaling down the preview replicaset
+      # if update is aborted. 0 means not to scale down. Default is 30 second
+      abortScaleDownDelaySeconds: {{ .Values.argoRollout.blueGreen.abortScaleDownDelaySeconds | default "30" }}
+
+      {{- if .Values.argoRollout.blueGreen.antiAffinity }}
+      # Anti Affinity configuration between desired and previous ReplicaSet.
+      # Only one must be specified
+      antiAffinity:
+        {{ toYaml .Values.argoRollout.blueGreen.antiAffinity  }}
+      {{- end }}
+    
+    {{- end }}
+    
+    {{- if and (not .Values.argoRollout.blueGreen.enabled) (.Values.argoRollout.canary.enabled) }}
+    {{- if not .Values.traefik.enabled }}
+    {{- fail "traefik.enabled must be enabled to true in order to do enable canary argo-rollout - argoRollout.canary.enabled" }}
+    {{- end }}
+    # Canary update strategy
+    canary:
+
+      # Reference to a service which the controller will update to select
+      # canary pods. Required for traffic routing.
+      canaryService: {{ include "nginx-echo-headers.fullname" . }}-canary
+
+      # Reference to a service which the controller will update to select
+      # stable pods. Required for traffic routing.
+      stableService: {{ include "nginx-echo-headers.fullname" . }}
+
+      # Metadata which will be attached to the canary pods. This metadata will
+      # only exist during an update, since there are no canary pods in a fully
+      # promoted rollout.
+      canaryMetadata:
+        annotations:
+          role: canary
+        labels:
+          role: canary
+
+      # metadata which will be attached to the stable pods
+      stableMetadata:
+        annotations:
+          role: stable
+        labels:
+          role: stable
+
+      {{- if .Values.argoRollout.canary.maxUnavailable }}
+      # The maximum number of pods that can be unavailable during the update.
+      # Value can be an absolute number (ex: 5) or a percentage of total pods
+      # at the start of update (ex: 10%). Absolute number is calculated from
+      # percentage by rounding down. This can not be 0 if  MaxSurge is 0. By
+      # default, a fixed value of 1 is used. Example: when this is set to 30%,
+      # the old RC can be scaled down by 30% immediately when the rolling
+      # update starts. Once new pods are ready, old RC can be scaled down
+      # further, followed by scaling up the new RC, ensuring that at least 70%
+      # of original number of pods are available at all times during the
+      # update. +optional
+      maxUnavailable: {{ .Values.argoRollout.canary.maxUnavailable }}
+      {{- end }}
+      
+      {{- if .Values.argoRollout.canary.maxSurge }}
+      # The maximum number of pods that can be scheduled above the original
+      # number of pods. Value can be an absolute number (ex: 5) or a
+      # percentage of total pods at the start of the update (ex: 10%). This
+      # can not be 0 if MaxUnavailable is 0. Absolute number is calculated
+      # from percentage by rounding up. By default, a value of 1 is used.
+      # Example: when this is set to 30%, the new RC can be scaled up by 30%
+      # immediately when the rolling update starts. Once old pods have been
+      # killed, new RC can be scaled up further, ensuring that total number
+      # of pods running at any time during the update is at most 130% of
+      # original pods. +optional
+      maxSurge: {{ .Values.argoRollout.canary.maxSurge }}
+      {{- end }}
+
+      # Adds a delay before scaling down the previous ReplicaSet when the
+      # canary strategy is used with traffic routing (default 30 seconds).
+      # A delay in scaling down the previous ReplicaSet is needed after
+      # switching the stable service selector to point to the new ReplicaSet,
+      # in order to give time for traffic providers to re-target the new pods.
+      # This value is ignored with basic, replica-weighted canary without
+      # traffic routing.
+      scaleDownDelaySeconds: {{ .Values.argoRollout.canary.scaleDownDelaySeconds | default 30 }}
+
+      # Limits the number of old RS that can run at one time before getting
+      # scaled down. Defaults to nil
+      scaleDownDelayRevisionLimit: {{ .Values.argoRollout.canary.scaleDownDelayRevisionLimit | default 2 }}
+
+      {{- if .Values.argoRollout.canary.analysis }}
+      # Background analysis to run during a rollout update. Skipped upon
+      # initial deploy of a rollout. +optional
+      analysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: guestbook-svc.default.svc.cluster.local
+
+        # valueFrom.podTemplateHashValue is a convenience to supply the
+        # rollouts-pod-template-hash value of either the Stable ReplicaSet
+        # or the Latest ReplicaSet
+        - name: stable-hash
+          valueFrom:
+            podTemplateHashValue: Stable
+        - name: latest-hash
+          valueFrom:
+            podTemplateHashValue: Latest
+
+        # valueFrom.fieldRef allows metadata about the rollout to be
+        # supplied as arguments to analysis.
+        - name: region
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['region']
+      {{- end }}
+
+      {{- if .Values.argoRollout.steps }}
+      # Steps define sequence of steps to take during an update of the
+      # canary. Skipped upon initial deploy of a rollout. +optional
+      steps:
+      {{- range .Values.argoRollout.steps }}
+      {{- if index . "setWeight" }}
+      - setWeight: {{ index . "setWeight" }}
+      {{- else if index . "pause" }}
+      {{- $duration := index . "pause" }}
+      - pause:
+          duration: {{ index $duration "duration" }}
+      {{- end }}
+      {{- end }}
+
+      {{- /*
+      ## steps example - note below is an example and is not a funcational template ##
+      
+      - setWeight: 10
+      - pause: {duration: 10 }
+      - setWeight: 20
+      - pause: {duration: 10 }
+      - setWeight: 40
+      - pause: {duration: 10}
+      - setWeight: 60
+      - pause: {duration: 10}
+      - setWeight: 80
+      - pause: {duration: 10}
+
+      # Sets header based route with specified header values
+      # Setting header based route will send all 100 traffic to the canary for the requests 
+      # O with a specified header, in this case request header "version":"2"
+      # (supported only with trafficRouting, for Istio only at the moment)
+      - setHeaderRoute:
+          # Name of the route that will be created by argo rollouts this must also be configured
+          # in spec.strategy.canary.trafficRouting.managedRoutes
+          name: "header-route-1"
+          # The matching rules for the header route, if this is missing it acts as a removal of the route.
+          match:
+              # headerName The name of the header to apply the match rules to.
+            - headerName: "version"
+              # headerValue must contain exactly one field of exact, regex, or prefix. Not all traffic routers support 
+              # all types
+              headerValue:
+                # Exact will only match if the header value is exactly the same
+                exact: "2"
+                # Will match the rule if the regular expression matches
+                regex: "2.0.(.*)"
+                # prefix will be a prefix match of the header value
+                prefix: "2.0"
+
+      # an inline analysis step
+      - analysis:
+          templates:
+          - templateName: success-rate
+
+      # an inline experiment step
+      - experiment:
+          duration: 1h
+          templates:
+          - name: baseline
+            specRef: stable
+          - name: canary
+            specRef: canary
+          analyses:
+          - name : mann-whitney
+            templateName: mann-whitney
+      
+      ## end of example ##
+      */}}
+      {{- end }}
+
+      {{- if .Values.argoRollout.canary.antiAffinity }}
+      # Anti-affinity configuration between desired and previous ReplicaSet.
+      # Only one must be specified.
+      antiAffinity:
+        {{ toYaml .Values.argoRollout.canary.antiAffinity }}
+      {{- end }}
+
+      # Traffic routing specifies the ingress controller or service mesh
+      # configuration to achieve advanced traffic splitting. If omitted,
+      # will achieve traffic split via a weighted replica counts between
+      # the canary and stable ReplicaSet.
+      trafficRouting:
+      # only traefik is supported in this chart
+        traefik:
+          {{- if not .Values.argoRollout.canary.mirror }}
+          weightedTraefikServiceName: {{ include "nginx-echo-headers.fullname" . }} # specify traefikService resource name that we have created before
+          {{- else }}
+          mirrorTraefikServiceName: {{ include "nginx-echo-headers.fullname" . }} # specify traefikService resource name that we have created before
+          {{- end }}
+      # Add a delay in second before scaling down the canary pods when update
+      # is aborted for canary strategy with traffic routing (not applicable for basic canary).
+      # 0 means canary pods are not scaled down. Default is 30 seconds.
+      abortScaleDownDelaySeconds: {{ .Values.argoRollout.canary.abortScaleDownDelaySeconds | default "30" }}
+    {{- end }}
+{{- end }}
