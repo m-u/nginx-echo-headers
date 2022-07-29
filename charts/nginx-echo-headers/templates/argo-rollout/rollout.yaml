@@ -89,22 +89,26 @@ spec:
       {{- end }}
   {{- end }}
 
+  {{- if .Values.argoRollout.minReadySeconds }}
   # Minimum number of seconds for which a newly created pod should be ready
   # without any of its container crashing, for it to be considered available.
   # Defaults to 0 (pod will be considered available as soon as it is ready)
-  minReadySeconds: {{ .Values.argoRollout.minReadySeconds | default "0" }}
+  minReadySeconds: {{ .Values.argoRollout.minReadySeconds }}
+  {{- end }}
 
   # The number of old ReplicaSets to retain.
   # Defaults to 10
   revisionHistoryLimit: {{ .Values.argoRollout.revisionHistoryLimit | default "10" }}
 
+  {{- if .Values.argoRollout.paused }}
   # Pause allows a user to manually pause a rollout at any time. A rollout
   # will not advance through its steps while it is manually paused, but HPA
   # auto-scaling will still occur. Typically not explicitly set the manifest,
   # but controlled via tools (e.g. kubectl argo rollouts pause). If true at
   # initial creation of Rollout, replicas are not scaled up automatically
   # from zero unless manually promoted.
-  paused: {{ .Values.argoRollout.revisionHistoryLimit | default "false" }}
+  paused: {{ .Values.argoRollout.paused }}
+  {{- end }}
 
   # The maximum time in seconds in which a rollout must make progress during
   # an update, before it is considered to be failed. Argo Rollouts will
@@ -115,9 +119,11 @@ spec:
   # Defaults to 600s
   progressDeadlineSeconds: {{ .Values.argoRollout.progressDeadlineSeconds | default "600" }}
 
+  {{- if .Values.argoRollout.progressDeadlineAbort }}
   # Whether to abort the update when ProgressDeadlineSeconds is exceeded.
   # Optional and default is false.
-  progressDeadlineAbort: {{ .Values.argoRollout.progressDeadlineAbort | default "false" }}
+  progressDeadlineAbort: {{ .Values.argoRollout.progressDeadlineAbort }}
+  {{- end }}
 
   strategy:
     {{- if and (.Values.argoRollout.blueGreen.enabled) (.Values.argoRollout.canary.enabled) }}
