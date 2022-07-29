@@ -4,7 +4,11 @@ kind: Rollout
 metadata:
   name: {{ include "nginx-echo-headers.fullname" . }}
 spec:
+
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
+
   analysis:
     # limits the number of successful analysis runs and experiments to be stored in a history
     # Defaults to 5.
