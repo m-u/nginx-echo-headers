@@ -203,8 +203,8 @@ spec:
     {{- end }}
     
     {{- if and (not .Values.argoRollout.blueGreen.enabled) (.Values.argoRollout.canary.enabled) }}
-    {{- if not .Values.traefik.enabled }}
-    {{- fail "traefik.enabled must be enabled to true in order to do enable canary argo-rollout - argoRollout.canary.enabled" }}
+    {{- if not .Values.ingress.traefik.enabled }}
+    {{- fail "ingress.traefik.enabled must be enabled to true in order to do enable canary argo-rollout - argoRollout.canary.enabled" }}
     {{- end }}
     # Canary update strategy
     canary:

@@ -13,8 +13,24 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: "0.0.2"
 
-traefik:
+ingress:
   enabled: false
+  annotations: {}
+  labels: {}
+  ## example of hosts:
+  hosts:
+# - name: nginx-echo-headers.domain1.com
+#   path: /
+#   tls: false
+# - name: nginx-echo-headers.domain2.com
+#   path: /
+#   tls: true
+## If TLS is set to true, you must declare what secret will store the key/certificate for TLS
+## Secrets must be added manually to the namespace
+# tlsSecret: chartmuseum.domain2-tls
+ingress:
+  traefik:
+    enabled: false
   https: 
     enabled: true
     certificate:

@@ -1,10 +1,11 @@
-{{- $httpsEnabled := .Values.traefik.https.enabled -}}
+{{- $httpsEnabled := .Values.ingress.https.enabled -}}
 {{- $fullname := include "nginx-echo-headers.fullname" . -}}
+{{- $serviceName := include "nginx-echo-headers.fullname" . -}}
 {{- $servicePort := .Values.service.port -}}
-{{- $middlewares := .Values.traefik.https.middlewares -}}
+{{- $middlewares := .Values.ingress.https.middlewares -}}
 {{- $releaseNamespace := .Release.Namespace }}
 
-{{- if .Values.traefik.enabled }}
+{{- if and (.Values.ingress.enabled) (.Values.ingress.traefik.enabled) }}
 {{- if $httpsEnabled }}
 ---
 apiVersion: traefik.containo.us/v1alpha1
@@ -15,13 +16,13 @@ spec:
   entryPoints:
   - websecure
   routes:
-  {{- range .Values.traefik.dnsNames }}
+  {{- range .Values.ingress.hosts }}
   - kind: Rule
-    match: Host(`{{.}}`)
+    match: Host(`{{ .name }}`)
     priority: 10
     services:
-    - name: {{ $fullname }}
-      port: {{ $servicePort }}
+    - name: {{ default $serviceName .service }}
+      port: {{ default $servicePort .servicePort }}
   {{- end }}
   tls:
     secretName: {{ include "nginx-echo-headers.fullname" . }}
@@ -35,13 +36,13 @@ spec:
   entryPoints:
     - web
   routes:
-  {{- range .Values.traefik.dnsNames }}
+  {{- range .Values.ingress.hosts }}
   - kind: Rule
-    match: Host(`{{.}}`)
+    match: Host(`{{ .name }}`)
     priority: 10
     services:
-    - name: {{ $fullname }}
-      port: {{ $servicePort }}
+    - name: {{ default $serviceName .service }}
+      port: {{ default $servicePort .servicePort }}
     {{- if  $httpsEnabled }}
     middlewares:
     {{-  range $middlewares }}

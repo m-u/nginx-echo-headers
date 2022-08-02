@@ -1,4 +1,4 @@
-{{- if and (.Values.argoRollout.canary.enabled) (.Values.traefik.enabled)  }}
+{{- if and (.Values.argoRollout.canary.enabled) (.Values.ingress.traefik.enabled)  }}
 apiVersion: traefik.containo.us/v1alpha1
 kind: TraefikService
 metadata:
