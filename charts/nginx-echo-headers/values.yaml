@@ -15,6 +15,10 @@ image:
 
 traefik:
   enabled: false
+  ingress: 
+    enabled: false
+    annoations: {}
+    labels: {}
   https: 
     enabled: true
     certificate:

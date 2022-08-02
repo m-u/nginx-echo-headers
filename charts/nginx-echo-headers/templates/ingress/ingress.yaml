@@ -1,0 +1,38 @@
+{{- $serviceName := include "nginx-echo-headers.fullname" . -}}
+{{- $secretName := include "nginx-echo-headers.fullname" . -}}
+{{- $servicePort := .Values.service.port -}}
+
+{{- if and .Values.traefik.enabled .Values.traefik.ingress.enabled  }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "nginx-echo-headers.fullname" . }}
+  {{- if .Values.traefik.ingress.annotations }}
+  annotations:
+  {{ toYaml .Values.traefik.ingress.annotations | indent 4 }}
+  {{- end }}
+  labels:
+  {{- if .Values.traefik.ingress.labels }}
+  {{ toYaml .Values.traefik.ingress.labels | indent 4 }}
+  {{- end }}
+  {{- include "nginx-echo-headers.labels" . | nindent 4 }}
+spec:
+  rules:
+  {{- range .Values.traefik.dnsNames }}
+  - host: {{ .name }}
+    http:
+      paths:
+      - path: {{ default "/" .path | quote }}
+        backend:
+          serviceName: {{ default $serviceName .service }}
+          servicePort: {{ default $servicePort .servicePort }}
+  {{- end }}
+  {{- if .Values.traefik.https.enabled }}
+  tls:
+  {{- range .Values.traefik.dnsNames }}
+  - hosts:
+    - {{ .name }}
+    secretName: {{ default $secretName .secretName }}
+  {{- end }}
+  {{- end }}
+{{- end }}
