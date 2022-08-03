@@ -4,7 +4,7 @@
 {{- $middlewares := .Values.traefik.https.middlewares -}}
 {{- $releaseNamespace := .Release.Namespace }}
 
-{{- if .Values.traefik.enabled }}
+{{- if and (.Values.traefik.enabled) (not .Values.traefik.ingress.enabled)  }}
 {{- if $httpsEnabled }}
 ---
 apiVersion: traefik.containo.us/v1alpha1
@@ -17,7 +17,7 @@ spec:
   routes:
   {{- range .Values.traefik.dnsNames }}
   - kind: Rule
-    match: Host(`{{.}}`)
+    match: Host(`{{ .name }}`)
     priority: 10
     services:
     - name: {{ $fullname }}
@@ -37,7 +37,7 @@ spec:
   routes:
   {{- range .Values.traefik.dnsNames }}
   - kind: Rule
-    match: Host(`{{.}}`)
+    match: Host(`{{ .name }}`)
     priority: 10
     services:
     - name: {{ $fullname }}
